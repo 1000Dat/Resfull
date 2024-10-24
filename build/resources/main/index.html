@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản lý Nhân viên</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 20px;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        label, input {
+            display: block;
+            margin: 10px 0;
+        }
+
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .message {
+            text-align: center;
+            margin-top: 10px;
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Quản lý Nhân viên</h2>
+
+    <form id="employeeForm">
+        <!-- Trường ẩn ID nhân viên -->
+        <input type="hidden" id="employeeId" name="employeeId">
+
+        <label for="firstName">Tên:</label>
+        <input type="text" id="firstName" name="firstName" placeholder="Nhập tên">
+
+        <label for="lastName">Họ:</label>
+        <input type="text" id="lastName" name="lastName" placeholder="Nhập họ">
+
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" placeholder="Nhập email">
+
+        <button type="button" id="submitBtn" onclick="createOrUpdateEmployee()">Tạo nhân viên</button>
+    </form>
+
+    <div id="response" class="message"></div>
+
+    <h3>Danh sách Nhân viên</h3>
+    <div id="employeeTable"></div>
+</div>
+<script>
+    var editingEmployeeId = null; // Biến để lưu id của nhân viên đang chỉnh sửa
+
+    function createOrUpdateEmployee() {
+        // Lấy giá trị từ các trường nhập liệu
+        var firstName = $("#firstName").val();
+        var lastName = $("#lastName").val();
+        var email = $("#email").val();
+
+        // Kiểm tra xem các trường có rỗng không
+        if (!firstName || !lastName || !email) {
+            $("#response").html("Vui lòng điền đầy đủ thông tin!").addClass('error');
+            return; // Dừng hàm nếu có trường rỗng
+        }
+
+        // Tạo đối tượng dữ liệu
+        var data = {
+            firstName: firstName,
+            lastName: lastName,
+            email: email
+        };
+
+        if (editingEmployeeId === null) {
+            // Nếu không có ID => tạo nhân viên mới
+            $.ajax({
+                url: 'http://localhost:8080/create', // Tạo nhân viên mới
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    $("#response").html("Nhân viên đã được tạo thành công: " + response.firstName + " " + response.lastName).removeClass('error');
+                    clearForm(); // Xóa form sau khi tạo
+                    loadEmployeeTable(); // Tải lại bảng nhân viên
+                },
+                error: function(xhr, status, error) {
+                    $("#response").html("Lỗi: " + xhr.responseText).addClass('error');
+                }
+            });
+        } else {
+            // Nếu có ID => cập nhật thông tin nhân viên
+            $.ajax({
+                url: 'http://localhost:8080/update/' + editingEmployeeId, // Cập nhật nhân viên
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    $("#response").html("Nhân viên đã được cập nhật thành công: " + response.firstName + " " + response.lastName).removeClass('error');
+                    clearForm(); // Xóa form sau khi cập nhật
+                    loadEmployeeTable(); // Tải lại bảng nhân viên
+                },
+                error: function(xhr, status, error) {
+                    $("#response").html("Lỗi: " + xhr.responseText).addClass('error');
+                }
+            });
+        }
+    }
+
+    // Hàm để tải danh sách nhân viên
+    function loadEmployeeTable() {
+        $.ajax({
+            url: 'http://localhost:8080/', // Đường dẫn API để lấy tất cả nhân viên
+            type: 'GET',
+            success: function(data) {
+                if (data && data.length > 0) {
+                    let table = '<table style="width: 100%; border-collapse: collapse;">';
+                    table += '<thead><tr><th style="border: 1px solid #ddd; padding: 8px;">STT</th><th style="border: 1px solid #ddd; padding: 8px;">Tên</th><th style="border: 1px solid #ddd; padding: 8px;">Họ</th><th style="border: 1px solid #ddd; padding: 8px;">Email</th><th style="border: 1px solid #ddd; padding: 8px;">Hành động</th></tr></thead><tbody>';
+
+                    data.forEach(function(employee, index) {
+                        table += `<tr>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${index + 1}</td> <!-- Hiển thị số thứ tự -->
+                        <td style="border: 1px solid #ddd; padding: 8px;">${employee.firstName}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${employee.lastName}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${employee.email}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">
+                            <button onclick="editEmployee(${employee.id})">Chỉnh sửa</button>
+                            <button onclick="deleteEmployee(${employee.id})">Xóa</button>
+                        </td>
+                    </tr>`;
+                    });
+
+                    table += '</tbody></table>';
+                    $("#employeeTable").html(table);
+                } else {
+                    $("#employeeTable").html('<p>Không có nhân viên nào.</p>');
+                }
+            },
+            error: function(xhr, status, error) {
+                $("#employeeTable").html('<p>Lỗi khi tải danh sách nhân viên.</p>');
+                console.error('Lỗi khi lấy dữ liệu nhân viên:', error);
+            }
+        });
+    }
+
+
+    // Hàm chỉnh sửa nhân viên
+    function editEmployee(id) {
+        $.ajax({
+            url: 'http://localhost:8080/employee/' + id, // Đường dẫn API để lấy thông tin nhân viên
+            type: 'GET',
+            success: function(employee) {
+                // Điền thông tin nhân viên vào form
+                $("#firstName").val(employee.firstName);
+                $("#lastName").val(employee.lastName);
+                $("#email").val(employee.email);
+                editingEmployeeId = employee.id; // Lưu lại ID của nhân viên đang chỉnh sửa
+            },
+            error: function(xhr, status, error) {
+                console.error('Lỗi khi lấy thông tin nhân viên:', error);
+            }
+        });
+    }
+
+    function deleteEmployee(id) {
+        const confirmed = confirm("Bạn có chắc chắn muốn xóa nhân viên này không?");
+      if(confirmed){
+          $.ajax({
+              url: 'http://localhost:8080/employee/' + id, // Đường dẫn API để xóa nhân viên
+              type: 'DELETE', // Phương thức DELETE
+              success: function(result) {
+                  // Xóa thành công, bạn có thể làm gì đó như thông báo hoặc cập nhật danh sách
+                  console.log('Xóa nhân viên thành công');
+                  // Ví dụ: gọi hàm để cập nhật lại danh sách nhân viên
+                  loadEmployeeTable()
+              },
+              error: function(xhr, status, error) {
+                  console.error('Lỗi khi xóa nhân viên:', error);
+              }
+          });
+      }
+      else {
+          // Nếu người dùng không xác nhận
+          console.log('Người dùng đã hủy xóa');
+      }
+    }
+
+    // Hàm xóa dữ liệu form và reset trạng thái chỉnh sửa
+    function clearForm() {
+        $("#firstName").val('');
+        $("#lastName").val('');
+        $("#email").val('');
+        editingEmployeeId = null; // Reset lại ID sau khi lưu
+    }
+
+    // Tải bảng nhân viên khi trang được tải
+    $(document).ready(function() {
+        loadEmployeeTable();
+    });
+</script>
+
+
+
+
+
+</body>
+</html>
